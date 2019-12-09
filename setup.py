@@ -8,7 +8,7 @@ setup(
   name='gbj_mqtt',
   version='1.0.0',
   description='Python package for module mqtt.',
-  long_description='Module for processing MQTT messages by MQTT clients.',
+  long_description='Processing MQTT messages by MQTT clients.',
   classifiers=[
     'Development Status :: 4 - Beta',
     'License :: OSI Approved :: MIT License',
