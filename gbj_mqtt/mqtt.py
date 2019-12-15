@@ -36,6 +36,8 @@ import time
 import socket
 import logging
 import abc
+from enum import Enum
+
 # Third party modules
 import paho.mqtt.client as mqttclient
 import paho.mqtt.publish as mqttpublish
@@ -64,6 +66,13 @@ RESULTS = [
     'BAD CREDENTIALS',
     'NOT AUTHORISED',
 ]
+
+
+class QoS(Enum):
+    """Enumeration of possible MQTT quality of service levels."""
+    AT_MOST_ONCE = 0
+    AT_LEAST_ONCE = 1
+    EXACTLY_ONCE = 2
 
 
 ###############################################################################
@@ -121,6 +130,27 @@ class MQTT(abc.ABC):
         """Flag about successful connection to an MQTT broker."""
         return self._connected
 
+    def check_qos(self, qos: QoS) -> int:
+        """Check validity of the enumeration member and return its value."""
+        try:
+            if isinstance(qos, QoS):
+                qos = qos.value
+            else:
+                qos = QoS[qos].value
+            return qos
+        except KeyError:
+            errmsg = f'Unknown MQTT QoS {qos}'
+            self._logger.error(errmsg)
+            raise Exception(errmsg)
+
+    def check_topic(self, topic: str) -> str:
+        """Check validity of the topic and return its value."""
+        if not topic:
+            errmsg = 'Empty MQTT topic'
+            self._logger.error(errmsg)
+            raise Exception(errmsg)
+        return topic
+
 
 ###############################################################################
 # Client of an MQTT broker
@@ -138,18 +168,8 @@ class MqttBroker(MQTT):
 
     """
 
-    # Predefined configuration file sections related to MQTT
     GROUP_BROKER = 'MQTTbroker'
     """str: Predefined configuration section with MQTT broker parameters."""
-
-    GROUP_TOPICS = 'MQTTtopics'
-    """str: Predefined configuration section with MQTT topics."""
-
-    GROUP_FILTERS = 'MQTTfilters'
-    """str: Predefined configuration section with MQTT topic filters."""
-
-    GROUP_DEFAULT = 'DEFAULT'
-    """str: Default configuration section with MQTT variables."""
 
     def __init__(self, config, **kwargs):
         """Create the class instance - constructor.
@@ -231,9 +251,7 @@ class MqttBroker(MQTT):
 
     def __str__(self):
         """Represent instance object as a string."""
-        msg = \
-            f'MQTTclient(' \
-            f'{self._clientid})'
+        msg = f'MQTTclient({self._clientid})'
         return msg
 
     def __repr__(self):
@@ -259,109 +277,9 @@ class MqttBroker(MQTT):
         msg += f')'
         return msg
 
-    def topic_def(self, option, section=GROUP_TOPICS):
-        """Return MQTT topic definition parameters.
-
-        Arguments
-        ---------
-        option : str
-            Configuration option from attached configuration file with
-            definition of an MQTT topic, which should be read.
-            *The argument is mandatory and has no default value.*
-        section : str
-            Configuration section from attached configuration file, where
-            configuration option should be searched.
-
-        Returns
-        -------
-        tuple of str and boolean
-            MQTT topic parameters as ``name``, ``qos``, ``retain``.
-
-        Notes
-        -----
-        The method appends ``0`` as the default `qos` and ``0`` as default
-        ``retain`` to the read topic definition for cases, when no `qos` and
-        `retain` is defined in order to split the topic properly.
-
-        """
-        try:
-            params = self._config.option_split(option, section, ['0', '0'])
-            name = params[0]
-            qos = abs(int(params[1]))
-            retain = bool(abs(int(params[2])))
-        except TypeError:
-            name = None
-            qos = None
-            retain = None
-        return (name, qos, retain)
-
-    def topic_name(self, option, section=GROUP_TOPICS):
-        """Return MQTT topic name.
-
-        Arguments
-        ---------
-        option : str
-            Configuration option from attached configuration file with
-            definition of an MQTT topic, which should be read.
-            *The argument is mandatory and has no default value.*
-        section : str
-            Configuration section from attached configuration file, where
-            configuration option should be searched.
-
-        Returns
-        -------
-        str
-            MQTT topic name.
-
-        """
-        params = self.topic_def(option, section)
-        return params[0]
-
-    def topic_qos(self, option, section=GROUP_TOPICS):
-        """Return MQTT topic QoS.
-
-        Arguments
-        ---------
-        option : str
-            Configuration option from attached configuration file with
-            definition of an MQTT topic, which should be read.
-            *The argument is mandatory and has no default value.*
-        section : str
-            Configuration section from attached configuration file, where
-            configuration option should be searched.
-
-        Returns
-        -------
-        int
-            MQTT topic `quality of service` as an absolute integer of second
-            parameter of read topic definition.
-
-        """
-        params = self.topic_def(option, section)
-        return params[1]
-
-    def topic_retain(self, option, section=GROUP_TOPICS):
-        """Return MQTT topic retain flag.
-
-        Arguments
-        ---------
-        option : str
-            Configuration option from attached configuration file with
-            definition of an MQTT topic, which should be read.
-            *The argument is mandatory and has no default value.*
-        section : str
-            Configuration section from attached configuration file, where
-            configuration option should be searched.
-
-        Returns
-        -------
-        boolean
-            MQTT topic `retain` as an logical value of third parameter of read
-            topic definition.
-
-        """
-        params = self.topic_def(option, section)
-        return params[2]
+    def _get_brokermsg(self, action: str) -> str:
+        msg = f'MQTT {action} broker "{self._host}:{self._port}"'
+        return msg
 
     def _on_connect(self, client, userdata, flags, rc):
         """Process actions when MQTT broker responds to a connection request.
@@ -397,7 +315,7 @@ class MqttBroker(MQTT):
 
         """
         self._wating = False
-        self._logger.debug('MQTT connect result %s: %s', rc, RESULTS[rc])
+        self._logger.debug(f'MQTT connect result {rc=}: {RESULTS[rc]}')
         if rc == 0:
             self._connected = True
         if self._cb_on_connect is not None:
@@ -414,59 +332,11 @@ class MqttBroker(MQTT):
             The private user data as set in Client() or user_data_set().
 
         """
-        self._logger.debug('MQTT disconnect result %s: %s', rc, RESULTS[rc])
+        self._logger.debug(f'MQTT disconnect result {rc}: {RESULTS[rc]}')
         if self._cb_on_disconnect is not None:
             self._cb_on_disconnect(client, RESULTS[rc], rc)
         self._client.loop_stop()
         self._connected = False
-
-    def callback_filters(self, **kwargs):
-        """Register callback functions for particular MQTT topic groups.
-
-        Keyword Arguments
-        -----------------
-        key : str
-            The key of the argument dictionary is a configuration option
-            defining a topic, to which a topic filter is related.
-        value : tuple
-            The value of the argument dictionary is a tuple with ``callback``
-            and ``section`` defining MQTT topic filter.
-
-            - If section is `GROUP_FILTERS`, the argument value can be just
-              the callback function.
-            - If section is not `GROUP_FILTERS`, the argument value should be
-              a tuple:
-
-                server_test=mqtt_on_message_test
-                server_sensor_temp=(mqtt_on_temp, ConfigMqtt.GROUP_TOPICS)
-
-        Notes
-        -----
-        - The method should be used before subscribing to respective filtered
-          topics. The best place is in the ``on_connect`` callback.
-        - The method can be called multiple times. For configuration option
-          used at a previous call the filter callback is just updated.
-        - If the callback is None, the filter for corresponding topic is
-          removed.
-
-        """
-        for option in kwargs:
-            definition = kwargs[option]
-            if isinstance(definition, tuple):
-                callback = definition[0]
-                section = definition[1]
-            else:
-                callback = definition
-                section = self.GROUP_FILTERS
-            topic = self.topic_name(option, section)
-            self._logger.debug(
-                'MQTT filter callback %s for topic %s',
-                callback.__name__, topic)
-            if topic is not None:
-                if callback is None:
-                    self._client.message_callback_remove(topic)
-                else:
-                    self._client.message_callback_add(topic, callback)
 
     def connect(self, username=None, password=None):
         """Connect to MQTT broker and set credentials.
@@ -487,9 +357,10 @@ class MqttBroker(MQTT):
         self._port = int(self._config.option(
             OPTION_PORT, self.GROUP_BROKER, 1883))
         # Connect to broker
-        self._logger.info(
-            'MQTT connection to broker %s:%s as client %s and user %s',
-            self._host, self._port, self._clientid, username)
+        msg = self._get_brokermsg('connection to')
+        client = self._clientid
+        user = username
+        self._logger.info(f'{msg} as {client=} and {user=}')
         self._wating = True
         try:
             self._client.loop_start()
@@ -497,11 +368,9 @@ class MqttBroker(MQTT):
                 self._client.username_pw_set(username, password)
             self._client.connect(self._host, self._port)
         except Exception as errmsg:
+            errmsg = f'{msg} failed: {errmsg}'
             self._client.loop_stop()
-            self._logger.error(
-                'MQTT connection to %s:%s failed: %s',
-                self._host, self._port, errmsg,  # exc_info=True
-                )
+            self._logger.error(errmsg)
             raise Exception(errmsg)
         # Waiting for connection
         while self._wating:
@@ -511,79 +380,46 @@ class MqttBroker(MQTT):
         """Disconnect from MQTT broker."""
         if not hasattr(self, '_client'):
             return
-        # Disconnect from broker
-        self._logger.info(
-            'MQTT disconnection from broker %s:%s as client %s',
-            self._host, self._port, self._clientid)
+        msg = self._get_brokermsg('disconnection from')
+        client = self._clientid
+        self._logger.info(f'{msg} as {client=}')
         try:
             self._client.loop_stop()
             self._client.disconnect()
         except Exception as errmsg:
-            self._logger.error(
-                'MQTT disconnection from %s:%s failed: %s',
-                self._host, self._port, errmsg,  # exc_info=True
-                )
+            errmsg = f'{msg} failed: {errmsg}'
+            self._logger.error(errmsg)
             raise Exception(errmsg)
 
     def reconnect(self):
         """Reconnect to MQTT broker."""
         if not hasattr(self, '_client'):
             return
-        # Reconnect to broker
-        self._logger.info(
-            'MQTT reconnection to broker %s:%s as client %s',
-            self._host, self._port, self._clientid)
+        msg = self._get_brokermsg('reconnection to')
+        client = self._clientid
+        self._logger.info(f'{msg} as {client=}')
         self._wating = True
         try:
             self._client.reconnect()
         except Exception as errmsg:
-            self._logger.error(
-                'MQTT reconnection to %s:%s failed: %s',
-                self._host, self._port, errmsg,  # exc_info=True
-                )
+            errmsg = f'{msg} failed: {errmsg}'
+            self._logger.error(errmsg)
             raise Exception(errmsg)
         # Waiting for connection
         while self._wating:
             time.sleep(0.2)
 
-    def subscribe_filters(self):
-        """Subscribe to all MQTT topic filters.
-
-        Raises
-        -------
-        Exception
-            General exception with error code.
-
-        """
-        if not self.connected:
-            return
-        for option in self._config.options(self.GROUP_FILTERS):
-            topic, qos, _ = self.topic_def(option, self.GROUP_FILTERS)
-            result = self._client.subscribe(topic, qos)
-            if result[0] == mqttclient.MQTT_ERR_SUCCESS:
-                self._logger.debug(
-                    'MQTT subscribe to filter %s, %s',
-                    topic, qos)
-            # elif result[0] == mqttclient.MQTT_ERR_NO_CONN:
-            else:
-                self._logger.error(
-                    'MQTT filter subscribe result %s',
-                    result[0])
-                raise Exception(str(result[0]))
-
-    def subscribe_topic(self, option, section=GROUP_TOPICS):
+    def subscribe(self,
+                  topic: str,
+                  qos: QoS = QoS.AT_MOST_ONCE):
         """Subscribe to an MQTT topic.
 
         Arguments
         ---------
-        option : str
-            Configuration option from attached configuration file with
-            definition of an MQTT topic, which should be read.
-            *The argument is mandatory and has no default value.*
-        section : str
-            Configuration section from attached configuration file, where
-            configuration option should be searched.
-
+        topic
+            MQTT topic, which should be subscribed to.
+        qos
+            Quality of Service enumeration item or directly its value.
         Raises
         -------
         Exception
@@ -592,88 +428,94 @@ class MqttBroker(MQTT):
         """
         if not self.connected:
             return
-        topic, qos, _ = self.topic_def(option, self.GROUP_TOPICS)
+        topic = self.check_topic(topic)
+        qos = self.check_qos(qos)
         result = self._client.subscribe(topic, qos)
-        if result[0] == mqttclient.MQTT_ERR_SUCCESS:
-            self._logger.debug(
-                'MQTT subscribe to topic %s, %d',
-                topic, qos)
-        # elif result[0] == mqttclient.MQTT_ERR_NO_CONN:
+        rc = result[0]
+        if rc == mqttclient.MQTT_ERR_SUCCESS:
+            self._logger.debug(f'MQTT client subscribed to {topic=}, {qos=}')
+        # elif rc == mqttclient.MQTT_ERR_NO_CONN:
         else:
-            self._logger.error(
-                'MQTT topic subscribe result %d',
-                result[0])
-            raise Exception(str(result[0]))
+            errmsg = \
+                f'MQTT subscription to {topic=}' \
+                f' failed with error code {rc=}'
+            self._logger.error(errmsg)
+            raise Exception(errmsg)
 
-    def publish(self, message, option, section=GROUP_TOPICS):
+    def publish(self,
+                message: str,
+                topic: str,
+                qos: QoS = QoS.AT_MOST_ONCE,
+                retain: bool = False):
         """Publish to an MQTT topic.
 
         Arguments
         ---------
-        message : str
+        message
             Data to be published into the topic.
-            *The argument is mandatory and has no default value.*
-        option : str
-            Configuration option from attached configuration file with
-            definition of an MQTT topic, which should be published to.
-            *The argument is mandatory and has no default value.*
-        section : str
-            Configuration section from attached configuration file, where
-            configuration option should be searched.
+        topic
+            MQTT topic, which should be published to.
+        qos
+            Quality of Service enumeration item or directly its value.
+        retain
+            Flag about retaining a message on the MQTT broker.
 
         Raises
         -------
         Exception
-            General exception with error code.
+            General exception with error message.
 
         """
         if not self.connected:
             return
-        topic, qos, retain = self.topic_def(option, section)
-        if topic is not None:
+        topic = self.check_topic(topic)
+        qos = self.check_qos(qos)
+        retain = bool(retain)
+        msg = f'Publishing to MQTT {topic=}'
+        try:
             self._client.publish(topic, message, qos, retain)
-            self._logger.debug(
-                'MQTT publishing to topic %s, %d, %s: %s',
-                topic, qos, retain, message)
-        else:
-            self._logger.error(
-                'Publishing to MQTT topic option %s:[%s] failed',
-                option, section)
-            raise Exception('Unknown option or section')
+            msg = f'{msg}, {qos=}, {retain=}: {message}'
+            self._logger.debug(msg)
+        except Exception as errmsg:
+            errmsg = f'{msg} failed: {errmsg}'
+            self._logger.error(errmsg)
+            raise Exception(errmsg)
 
-    def lwt(self, message, option, section=GROUP_TOPICS):
+    def lwt(self,
+            message: str,
+            topic: str,
+            qos: QoS = QoS.AT_MOST_ONCE,
+            retain: bool = True):
         """Set last will and testament.
 
         Arguments
         ---------
-        message : str
+        message
             Data to be set as LWT payload.
-            *The argument is mandatory and has no default value.*
-        option : str
-            Configuration option from attached configuration file with
-            definition of an MQTT topic for LWT.
-            *The argument is mandatory and has no default value.*
-        section : str
-            Configuration section from attached configuration file, where
-            configuration option should be searched.
+        topic
+            MQTT topic, which should be LWT published to.
+        qos
+            Quality of Service enumeration item or directly its value.
+        retain
+            Flag about retaining a message on the MQTT broker.
 
         Raises
         -------
         Exception
-            If qos is not 0, 1 or 2, or if topic is None
-            or has zero string length.
+            General exception with error message.
 
         """
         if not hasattr(self, '_client'):
             return
-        topic, qos, retain = self.topic_def(option, section)
+        topic = self.check_topic(topic)
+        qos = self.check_qos(qos)
+        retain = bool(retain)
+        msg = f'MQTT LWT {topic=}'
         try:
             self._client.will_set(topic, message, qos, retain)
-            self._logger.debug(
-                'MQTT LWT to topic %s, %d, %s: %s',
-                topic, qos, retain, message)
-        except ValueError:
-            self._logger.error(
-                'LWT to MQTT topic option %s:[%s] failed',
-                option, section)
-            raise Exception('Unknown option, section, or topic parameters')
+            msg = f'{msg}, {qos=}, {retain=}: {message}'
+            self._logger.debug(msg)
+        except Exception as errmsg:
+            errmsg = f'{msg} failed: {errmsg}'
+            self._logger.error(errmsg)
+            raise Exception(errmsg)
