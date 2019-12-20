@@ -35,7 +35,7 @@ __email__ = 'libor.gabaj@gmail.com'
 import time
 import socket
 import logging
-import abc
+from abc import ABC, abstractmethod
 from enum import Enum
 
 # Third party modules
@@ -78,7 +78,7 @@ class QoS(Enum):
 ###############################################################################
 # Abstract class as a base for all MQTT clients
 ###############################################################################
-class MQTT(abc.ABC):
+class MQTT(ABC):
     """Common MQTT management.
 
     Arguments
@@ -105,7 +105,7 @@ class MQTT(abc.ABC):
     def __init__(self, config):
         """Create the class instance - constructor."""
         self._config = config
-        self._connected = False
+        self.connected = False  # Flag about connection to an MQTT broker
         # Logging
         self._logger = logging.getLogger(' '.join([__name__, __version__]))
 
@@ -125,13 +125,20 @@ class MQTT(abc.ABC):
             msg += f'None'
         return msg + ')'
 
-    @property
-    def connected(self):
-        """Flag about successful connection to an MQTT broker."""
-        return self._connected
-
     def check_qos(self, qos: QoS) -> int:
-        """Check validity of the enumeration member and return its value."""
+        """Check validity of the enumeration member and return its value.
+
+        Returns
+        -------
+        int
+            Quality of Service numeric code.
+
+        Raises
+        -------
+        ValueError
+            Input string is not an enumeration key.
+
+        """
         try:
             if isinstance(qos, QoS):
                 qos = qos.value
@@ -141,15 +148,27 @@ class MQTT(abc.ABC):
         except KeyError:
             errmsg = f'Unknown MQTT QoS {qos}'
             self._logger.error(errmsg)
-            raise Exception(errmsg)
+            raise ValueError(errmsg)
 
     def check_topic(self, topic: str) -> str:
-        """Check validity of the topic and return its value."""
+        """Check validity of the topic and return its value.
+
+        Returns
+        -------
+        str
+            String with MQTT topic.
+
+        Raises
+        -------
+        ValueError
+            Input is empty or not defined.
+
+        """
         if not topic:
             errmsg = 'Empty MQTT topic'
             self._logger.error(errmsg)
-            raise Exception(errmsg)
-        return topic
+            raise ValueError(errmsg)
+        return str(topic)
 
 
 ###############################################################################
@@ -338,15 +357,20 @@ class MqttBroker(MQTT):
         self._client.loop_stop()
         self._connected = False
 
-    def connect(self, username=None, password=None):
+    def connect(self, username: str = None, password: str = None):
         """Connect to MQTT broker and set credentials.
 
         Arguments
         ---------
-        username : str
+        username
             Login name of the registered user at MQTT broker.
-        password : str
+        password
             Password of the registered user at MQTT broker.
+
+        Raises
+        -------
+        SystemError
+            Cannot connect to MQTT broker.
 
         """
         if not hasattr(self, '_client'):
@@ -371,13 +395,20 @@ class MqttBroker(MQTT):
             errmsg = f'{msg} failed: {errmsg}'
             self._client.loop_stop()
             self._logger.error(errmsg)
-            raise Exception(errmsg)
+            raise SystemError(errmsg)
         # Waiting for connection
         while self._wating:
             time.sleep(0.2)
 
     def disconnect(self):
-        """Disconnect from MQTT broker."""
+        """Disconnect from MQTT broker.
+
+        Raises
+        -------
+        SystemError
+            Cannot disconnect from MQTT broker.
+
+        """
         if not hasattr(self, '_client'):
             return
         msg = self._get_brokermsg('disconnection from')
@@ -389,10 +420,17 @@ class MqttBroker(MQTT):
         except Exception as errmsg:
             errmsg = f'{msg} failed: {errmsg}'
             self._logger.error(errmsg)
-            raise Exception(errmsg)
+            raise SystemError(errmsg)
 
     def reconnect(self):
-        """Reconnect to MQTT broker."""
+        """Reconnect to MQTT broker.
+
+        Raises
+        -------
+        SystemError
+            Cannot reconnect to MQTT broker.
+
+        """
         if not hasattr(self, '_client'):
             return
         msg = self._get_brokermsg('reconnection to')
@@ -404,7 +442,7 @@ class MqttBroker(MQTT):
         except Exception as errmsg:
             errmsg = f'{msg} failed: {errmsg}'
             self._logger.error(errmsg)
-            raise Exception(errmsg)
+            raise SystemError(errmsg)
         # Waiting for connection
         while self._wating:
             time.sleep(0.2)
@@ -420,10 +458,11 @@ class MqttBroker(MQTT):
             MQTT topic, which should be subscribed to.
         qos
             Quality of Service enumeration item or directly its value.
+
         Raises
         -------
-        Exception
-            General exception with error code.
+        SystemError
+            Cannot subscribe to MQTT topic.
 
         """
         if not self.connected:
@@ -440,7 +479,7 @@ class MqttBroker(MQTT):
                 f'MQTT subscription to {topic=}' \
                 f' failed with error code {rc=}'
             self._logger.error(errmsg)
-            raise Exception(errmsg)
+            raise SystemError(errmsg)
 
     def publish(self,
                 message: str,
@@ -462,8 +501,8 @@ class MqttBroker(MQTT):
 
         Raises
         -------
-        Exception
-            General exception with error message.
+        SystemError
+            Cannot publish to a MQTT topic.
 
         """
         if not self.connected:
@@ -479,7 +518,7 @@ class MqttBroker(MQTT):
         except Exception as errmsg:
             errmsg = f'{msg} failed: {errmsg}'
             self._logger.error(errmsg)
-            raise Exception(errmsg)
+            raise SystemError(errmsg)
 
     def lwt(self,
             message: str,
@@ -501,8 +540,8 @@ class MqttBroker(MQTT):
 
         Raises
         -------
-        Exception
-            General exception with error message.
+        SystemError
+            Cannot set LWT for a MQTT client.
 
         """
         if not hasattr(self, '_client'):
@@ -518,4 +557,4 @@ class MqttBroker(MQTT):
         except Exception as errmsg:
             errmsg = f'{msg} failed: {errmsg}'
             self._logger.error(errmsg)
-            raise Exception(errmsg)
+            raise SystemError(errmsg)
