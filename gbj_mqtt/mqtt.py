@@ -1,26 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Module for communicating with MQTT brokers.
-
-Notes
------
-- Connection to MQTT brokers is supposed to be over TCP.
-- All parameters for MQTT brokers and clients should be defined
-  in a configuration file utilized by a script or application employed this
-  package.
-- MQTT parameters are communicated with class instances of the module
-  indirectly in form of pair option-section from the configuration file.
-- Module constants are usual configuration options used at every form of MQTT
-  brokers. Those options can be considered as common names for common
-  identifiers either MQTT brokers or clients regardles of the configuration
-  sections.
-- Particular classed have their own class constants, which define specific
-  configuration options and sections utilized for that form of MQTT broker.
-- All module and class constants should be considered as default values.
-  At each calling of respective methods specific configuration options and
-  sections can be used. However, using in module standardized options and
-  sections is recommended.
-
-"""
+"""Module for communicating with MQTT brokers."""
 __version__ = '0.1.0'
 __status__ = 'Beta'
 __author__ = 'Libor Gabaj'
@@ -46,18 +25,6 @@ import paho.mqtt.publish as mqttpublish
 ###############################################################################
 # Module parameters
 ###############################################################################
-OPTION_CLIENTID = 'clientid'
-"""str: Configuration option with MQTT client identifier."""
-
-OPTION_USERDATA = 'userdata'
-"""str: Configuration option with custom data for MQTT callbacks."""
-
-OPTION_HOST = 'host'
-"""str: Configuration option with MQTT broker IP or URL."""
-
-OPTION_PORT = 'port'
-"""int: Configuration option with MQTT broker TCP port."""
-
 RESULTS = [
     'SUCCESS',
     'BAD PROTOCOL',
@@ -79,51 +46,22 @@ class QoS(Enum):
 # Abstract class as a base for all MQTT clients
 ###############################################################################
 class MQTT(ABC):
-    """Common MQTT management.
+    """Common MQTT management."""
 
-    Arguments
-    ---------
-    config : object
-        Object for access to a configuration INI file.
-        It is instance of the class ``Config`` from this package's module
-        ``config``.
-        Particular configuration file is already open.
-        Injection of the config file object to this class instance is a form
-        of attaching that file to this object.
-
-    Notes
-    -----
-    This class should not be instanciated. It serves as a abstract class and
-    a parent class for operational classes for particular MQTT brokers.
-
-    See Also
-    --------
-    config.Config : Class for managing configuration INI files.
-
-    """
-
-    def __init__(self, config):
+    def __init__(self):
         """Create the class instance - constructor."""
-        self._config = config
         self.connected = False  # Flag about connection to an MQTT broker
         # Logging
         self._logger = logging.getLogger(' '.join([__name__, __version__]))
 
     def __str__(self):
         """Represent instance object as a string."""
-        msg = \
-            f'ConfigFile(' \
-            f'{self._config.configfile})'
-        return msg
+        return 'ConfigFile()'
 
     def __repr__(self):
         """Represent instance object officially."""
-        msg = f'{self.__class__.__name__}('
-        if self._config:
-            msg += f'config={repr(self._config.configfile)}'
-        else:
-            msg += f'None'
-        return msg + ')'
+        msg = f'{self.__class__.__name__}()'
+        return msg
 
     def check_qos(self, qos: QoS) -> int:
         """Check validity of the enumeration member and return its value.
@@ -179,23 +117,19 @@ class MqttBroker(MQTT):
 
     Notes
     -----
-    - The client utilizes MQTT topics and topic filters definitions from
-      a configuration file.
     - The authorization of an MQTT client is supposed to be with username and
       password registered on connecting MQTT broker.
     - The encrypted communication (SSL/TSL) is not used.
 
     """
 
-    GROUP_BROKER = 'MQTTbroker'
-    """str: Predefined configuration section with MQTT broker parameters."""
-
-    def __init__(self, config, **kwargs):
+    def __init__(self, **kwargs):
         """Create the class instance - constructor.
 
         Keyword Arguments
         -----------------
-
+        clientid : str
+            MQTT client identifier.
         clean_session : boolean
             A flag that determines the client type. If 'True', the broker will
             remove all information about this client when it disconnects.
@@ -231,15 +165,10 @@ class MqttBroker(MQTT):
         callbacks without prefix ``on_``.
 
         """
-        super().__init__(config)
+        super().__init__()
         # Client parameters
-        self._clientid = self._config.option(
-            OPTION_CLIENTID, self.GROUP_BROKER,
-            socket.gethostname()
-        )
-        self._userdata = self._config.option(
-            OPTION_USERDATA, self.GROUP_BROKER)
-        self._userdata = kwargs.pop('userdata', self._userdata)
+        self._clientid = kwargs.pop('clientid', socket.gethostname())
+        self._userdata = kwargs.pop('userdata', None)
         self._clean_session = bool(kwargs.pop('clean_session', True))
         self._protocol = kwargs.pop('protocol', mqttclient.MQTTv311)
         self._transport = kwargs.pop('transport', 'tcp')
@@ -276,10 +205,6 @@ class MqttBroker(MQTT):
     def __repr__(self):
         """Represent instance object officially."""
         msg = f'{self.__class__.__name__}('
-        if self._config:
-            msg += f'config={repr(self._config.configfile)}'
-        else:
-            msg += f'None'
         msg += \
             f', clean_session={repr(self._clean_session)}' \
             f', userdata={repr(self._userdata)}' \
@@ -336,7 +261,7 @@ class MqttBroker(MQTT):
         self._wating = False
         self._logger.debug(f'MQTT connect result {rc=}: {RESULTS[rc]}')
         if rc == 0:
-            self._connected = True
+            self.connected = True
         if self._cb_on_connect is not None:
             self._cb_on_connect(client, RESULTS[rc], flags, rc)
 
@@ -355,17 +280,21 @@ class MqttBroker(MQTT):
         if self._cb_on_disconnect is not None:
             self._cb_on_disconnect(client, RESULTS[rc], rc)
         self._client.loop_stop()
-        self._connected = False
+        self.connected = False
 
-    def connect(self, username: str = None, password: str = None):
+    def connect(self, **kwargs):
         """Connect to MQTT broker and set credentials.
 
-        Arguments
-        ---------
-        username
+        Keyword Arguments
+        -----------------
+        username : str
             Login name of the registered user at MQTT broker.
-        password
+        password : str
             Password of the registered user at MQTT broker.
+        host : str
+            MQTT broker IP or URL.
+        port : int
+            MQTT broker TCP port.
 
         Raises
         -------
@@ -376,15 +305,14 @@ class MqttBroker(MQTT):
         if not hasattr(self, '_client'):
             return
         # Broker parameters
-        self._host = self._config.option(
-            OPTION_HOST, self.GROUP_BROKER, 'localhost')
-        self._port = int(self._config.option(
-            OPTION_PORT, self.GROUP_BROKER, 1883))
+        self._host = kwargs.pop('host', 'localhost')
+        self._port = int(kwargs.pop('port', 1883))
         # Connect to broker
+        username = kwargs.pop('username')
+        password = kwargs.pop('password')
         msg = self._get_brokermsg('connection to')
         client = self._clientid
-        user = username
-        self._logger.info(f'{msg} as {client=} and {user=}')
+        self._logger.info(f'{msg} as {client=} and {username=}')
         self._wating = True
         try:
             self._client.loop_start()
