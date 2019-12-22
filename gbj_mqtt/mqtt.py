@@ -225,16 +225,20 @@ class MqttBroker(MQTT):
         msg = f'MQTT {action} broker "{self._host}:{self._port}"'
         return msg
 
-    def _on_connect(self, client, userdata, flags, rc):
+    def _on_connect(self,
+                    client: mqttclient,
+                    userdata: any,
+                    flags: dict(),
+                    rc: int):
         """Process actions when MQTT broker responds to a connection request.
 
         Arguments
         ---------
-        client : object
+        client
             The client instance for this callback.
         userdata
             The private user data as set in Client() or user_data_set().
-        flags : dict
+        flags
             Response flags sent by the MQTT broker.
             ``flags['session present']`` is useful for clients that are
             using clean session set to `0` only. If a client with clean
@@ -242,7 +246,7 @@ class MqttBroker(MQTT):
             connected to, this flag indicates whether the broker still has the
             session information for the client. If `1`, the session still
             exists.
-        rc : int
+        rc
             The connection result (result code):
 
             - 0: Connection successful
@@ -265,15 +269,20 @@ class MqttBroker(MQTT):
         if self._cb_on_connect is not None:
             self._cb_on_connect(client, RESULTS[rc], flags, rc)
 
-    def _on_disconnect(self, client, userdata, rc):
+    def _on_disconnect(self,
+                       client: mqttclient,
+                       userdata: any,
+                       rc: int):
         """Process actions when the client disconnects from the broker.
 
         Arguments
         ---------
-        client : object
+        client
             The client instance for this callback.
         userdata
             The private user data as set in Client() or user_data_set().
+        rc
+            The connection result (result code).
 
         """
         self._logger.debug(f'MQTT disconnect result {rc}: {RESULTS[rc]}')
