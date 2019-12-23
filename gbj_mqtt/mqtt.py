@@ -16,6 +16,7 @@ import socket
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
+from typing import NoReturn
 
 # Third party modules
 import paho.mqtt.client as mqttclient
@@ -48,17 +49,17 @@ class QoS(Enum):
 class MQTT(ABC):
     """Common MQTT management."""
 
-    def __init__(self):
+    def __init__(self) -> NoReturn:
         """Create the class instance - constructor."""
         self.connected = False  # Flag about connection to an MQTT broker
         # Logging
         self._logger = logging.getLogger(' '.join([__name__, __version__]))
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Represent instance object as a string."""
         return 'ConfigFile()'
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Represent instance object officially."""
         msg = f'{self.__class__.__name__}()'
         return msg
@@ -123,7 +124,7 @@ class MqttBroker(MQTT):
 
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> NoReturn:
         """Create the class instance - constructor.
 
         Keyword Arguments
@@ -197,12 +198,12 @@ class MqttBroker(MQTT):
             self.__class__.__name__, str(self)
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Represent instance object as a string."""
         msg = f'MQTTclient({self._clientid})'
         return msg
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Represent instance object officially."""
         msg = f'{self.__class__.__name__}('
         msg += \
@@ -229,7 +230,7 @@ class MqttBroker(MQTT):
                     client: mqttclient,
                     userdata: any,
                     flags: dict(),
-                    rc: int):
+                    rc: int) -> NoReturn:
         """Process actions when MQTT broker responds to a connection request.
 
         Arguments
@@ -272,7 +273,7 @@ class MqttBroker(MQTT):
     def _on_disconnect(self,
                        client: mqttclient,
                        userdata: any,
-                       rc: int):
+                       rc: int) -> NoReturn:
         """Process actions when the client disconnects from the broker.
 
         Arguments
@@ -291,7 +292,7 @@ class MqttBroker(MQTT):
         self._client.loop_stop()
         self.connected = False
 
-    def connect(self, **kwargs):
+    def connect(self, **kwargs) -> NoReturn:
         """Connect to MQTT broker and set credentials.
 
         Keyword Arguments
@@ -337,7 +338,7 @@ class MqttBroker(MQTT):
         while self._wating:
             time.sleep(0.2)
 
-    def disconnect(self):
+    def disconnect(self) -> NoReturn:
         """Disconnect from MQTT broker.
 
         Raises
@@ -359,7 +360,7 @@ class MqttBroker(MQTT):
             self._logger.error(errmsg)
             raise SystemError(errmsg)
 
-    def reconnect(self):
+    def reconnect(self) -> NoReturn:
         """Reconnect to MQTT broker.
 
         Raises
@@ -386,7 +387,7 @@ class MqttBroker(MQTT):
 
     def subscribe(self,
                   topic: str,
-                  qos: QoS = QoS.AT_MOST_ONCE):
+                  qos: QoS = QoS.AT_MOST_ONCE) -> NoReturn:
         """Subscribe to an MQTT topic.
 
         Arguments
@@ -422,7 +423,7 @@ class MqttBroker(MQTT):
                 message: str,
                 topic: str,
                 qos: QoS = QoS.AT_MOST_ONCE,
-                retain: bool = False):
+                retain: bool = False) -> NoReturn:
         """Publish to an MQTT topic.
 
         Arguments
@@ -461,7 +462,7 @@ class MqttBroker(MQTT):
             message: str,
             topic: str,
             qos: QoS = QoS.AT_MOST_ONCE,
-            retain: bool = True):
+            retain: bool = True) -> NoReturn:
         """Set last will and testament.
 
         Arguments
