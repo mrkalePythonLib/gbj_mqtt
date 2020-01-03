@@ -32,6 +32,7 @@ class Result(Enum):
     NO_SERVER = 3
     BAD_CREDENTIALS = 4
     NOT_AUTHORISED = 5
+    UNEXPECTED_ERROR = 6
 
 
 class QoS(Enum):
@@ -193,9 +194,9 @@ class MqttBroker():
                 qos = QoS[qos].value
             return qos
         except KeyError:
-            errmsg = f'Unknown MQTT QoS {qos}'
-            self._logger.error(errmsg)
-            raise ValueError(errmsg)
+            log = f'Unknown MQTT QoS {qos}'
+            self._logger.error(log)
+            raise ValueError(log)
 
     def check_topic(self, topic: str) -> str:
         """Check validity of the topic and return its value.
@@ -211,9 +212,9 @@ class MqttBroker():
 
         """
         if not topic:
-            errmsg = 'Empty MQTT topic'
-            self._logger.error(errmsg)
-            raise ValueError(errmsg)
+            log = 'Empty MQTT topic'
+            self._logger.error(log)
+            raise ValueError(log)
         return str(topic)
 
     def _get_brokermsg(self, action: str) -> str:
@@ -359,21 +360,20 @@ class MqttBroker():
             if self._username is not None:
                 self._client.username_pw_set(self._username,
                                              self._password)
-            errmsg = f'{msg} started'
-            self._logger.info(errmsg)
+            log = f'{msg} started'
+            self._logger.info(log)
             self._client.connect(self._host, self._port)
-        except Exception as errmsg:
-            errmsg = f'{msg} failed: {errmsg}'
+        except ConnectionRefusedError as errmsg:
+            log = f'{msg} failed: {errmsg}'
+            self._logger.error(log)
             self._client.loop_stop()
-            self._logger.error(errmsg)
-            raise SystemError(errmsg)
         # Waiting for connection
         if self._eventor.wait(self.Param.TIMEOUT.value):
-            errmsg = f'{msg} succeeded'
-            self._logger.info(errmsg)
+            log = f'{msg} succeeded'
+            self._logger.info(log)
         else:
-            errmsg = f'{msg} timeouted'
-            self._logger.error(errmsg)
+            log = f'{msg} timeouted'
+            self._logger.error(log)
             self.disconnect()
 
     def reconnect(self) -> NoReturn:
@@ -392,20 +392,19 @@ class MqttBroker():
         msg = f'{msg} as {client=}'
         try:
             self._eventor.clear()
-            errmsg = f'{msg} started'
-            self._logger.info(errmsg)
+            log = f'{msg} started'
+            self._logger.info(log)
             self._client.reconnect()
-        except Exception as errmsg:
-            errmsg = f'{msg} failed: {errmsg}'
-            self._logger.error(errmsg)
-            raise SystemError(errmsg)
+        except ConnectionRefusedError as errmsg:
+            log = f'{msg} failed: {errmsg}'
+            self._logger.error(log)
         # Waiting for connection
         if self._eventor.wait(self.Param.TIMEOUT.value):
-            errmsg = f'{msg} succeeded'
-            self._logger.info(errmsg)
+            log = f'{msg} succeeded'
+            self._logger.info(log)
         else:
-            errmsg = f'{msg} timeouted'
-            self._logger.error(errmsg)
+            log = f'{msg} timeouted'
+            self._logger.error(log)
             # Try original connection
             self.connect(
                 username=self._username,
@@ -433,9 +432,8 @@ class MqttBroker():
             msg = f'{msg} succeeded'
             self._logger.info(msg)
         except Exception as errmsg:
-            errmsg = f'{msg} failed: {errmsg}'
-            self._logger.error(errmsg)
-            raise SystemError(errmsg)
+            log = f'{msg} failed: {errmsg}'
+            self._logger.exception(log)
 
     def subscribe(self,
                   topic: str,
@@ -466,11 +464,11 @@ class MqttBroker():
             self._logger.debug(msg)
         # elif result_code == mqttclient.MQTT_ERR_NO_CONN:
         else:
-            errmsg = \
+            log = \
                 f'MQTT subscription to {topic=}' \
                 f' failed with result code={result_code}'
-            self._logger.error(errmsg)
-            raise SystemError(errmsg)
+            self._logger.error(log)
+            raise SystemError(log)
 
     def publish(self,
                 message: str,
@@ -536,6 +534,5 @@ class MqttBroker():
             msg = f'{msg}, {qos=}, {retain=}: {message}'
             self._logger.debug(msg)
         except Exception as errmsg:
-            errmsg = f'{msg} failed: {errmsg}'
-            self._logger.error(errmsg)
-            raise SystemError(errmsg)
+            log = f'{msg} failed: {errmsg}'
+            self._logger.exception(log)
