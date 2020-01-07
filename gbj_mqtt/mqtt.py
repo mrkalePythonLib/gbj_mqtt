@@ -11,8 +11,8 @@ __email__ = 'libor.gabaj@gmail.com'
 
 
 # Standard library modules
-import socket
 import logging
+import socket
 from enum import Enum
 from typing import NoReturn, Any
 from threading import Event
@@ -59,8 +59,8 @@ class MqttBroker():
     class Param(Enum):
         """MQTT broker default parameters."""
         TIMEOUT = 10.0
-        PORT = 1883
         HOST = 'localhost'
+        PORT = 1883
 
     def __init__(self, **kwargs) -> NoReturn:
         """Create the class instance - constructor.
@@ -133,34 +133,33 @@ class MqttBroker():
         self._client.on_subscribe = self._on_subscribe
         self._client.on_message = self._on_message
         # Logging
-        msg = f'Instance of "{self.__class__.__name__}" created: {self}'
+        log = f'Instance of "{self.__class__.__name__}" created: {self}'
         self._logger = logging.getLogger(' '.join([__name__, __version__]))
-        self._logger.debug(msg)
+        self._logger.debug(log)
 
     def __str__(self) -> str:
         """Represent instance object as a string."""
-        msg = f'MQTTclient({self._clientid})'
-        return msg
+        return f'MQTTclient({self._clientid})'
 
     def __repr__(self) -> str:
         """Represent instance object officially."""
-        msg = f'{self.__class__.__name__}('
-        msg += \
+        log = f'{self.__class__.__name__}('
+        log += \
             f'clientid={repr(self._clientid)}' \
             f', clean_session={repr(self._clean_session)}' \
             f', userdata={repr(self._userdata)}' \
             f', protocol={repr(self._protocol)}' \
             f', transport={repr(self._transport)}'
         if self._cb_on_connect:
-            msg += f', connect={self._cb_on_connect.__name__}'
+            log += f', connect={self._cb_on_connect.__name__}'
         if self._cb_on_disconnect:
-            msg += f', disconnect={self._cb_on_disconnect.__name__}'
+            log += f', disconnect={self._cb_on_disconnect.__name__}'
         if self._cb_on_subscribe:
-            msg += f', subscribe={self._cb_on_subscribe.__name__}'
+            log += f', subscribe={self._cb_on_subscribe.__name__}'
         if self._cb_on_message:
-            msg += f', message={self._cb_on_message.__name__}'
-        msg += f')'
-        return msg
+            log += f', message={self._cb_on_message.__name__}'
+        log += f')'
+        return log
 
     @property
     def connected(self) -> bool:
@@ -218,8 +217,8 @@ class MqttBroker():
         return str(topic)
 
     def _get_brokermsg(self, action: str) -> str:
-        msg = f"MQTT {action} broker '{self._host}:{self._port}'"
-        return msg
+        log = f"MQTT {action} broker '{self._host}:{self._port}'"
+        return log
 
     def _on_connect(self,
                     client: mqttclient,
@@ -258,10 +257,10 @@ class MqttBroker():
         Client(),  user_data_set() : Methods from imported module.
 
         """
-        msg = \
+        log = \
             f'MQTT on connect: {userdata=}' \
             f', {result=} ({Result(result).name})'
-        self._logger.debug(msg)
+        self._logger.debug(log)
         if result == 0:
             self.connected = True
             self._eventor.set()
@@ -284,10 +283,10 @@ class MqttBroker():
             The disconnection result code.
 
         """
-        msg = \
+        log = \
             f'MQTT on disconnect: {userdata=}' \
             f', {result=} ({Result(result).name})'
-        self._logger.debug(msg)
+        self._logger.debug(log)
         if self._cb_on_disconnect is not None:
             self._cb_on_disconnect(userdata, result)
         self._client.loop_stop()
@@ -299,8 +298,8 @@ class MqttBroker():
                       mid: int,
                       granted_qos: int) -> NoReturn:
         """Process actions when MQTT broker responds to the subscription."""
-        msg = f'MQTT on subscribe: {userdata=}, {mid=}, {granted_qos=}'
-        self._logger.debug(msg)
+        log = f'MQTT on subscribe: {userdata=}, {mid=}, {granted_qos=}'
+        self._logger.debug(log)
         if self._cb_on_subscribe is not None:
             self._cb_on_subscribe(userdata, mid, granted_qos)
 
@@ -315,10 +314,10 @@ class MqttBroker():
         payload = message.payload
         if payload:
             payload = payload.decode('utf-8')
-        msg = \
+        log = \
             f'MQTT on message: {userdata=}, {topic=}, {qos=}, {retain=}' \
             f', {payload=}'
-        self._logger.debug(msg)
+        self._logger.debug(log)
         if self._cb_on_message is not None:
             self._cb_on_message(userdata, message)
 
@@ -335,11 +334,6 @@ class MqttBroker():
             MQTT broker IP or URL.
         port : int
             MQTT broker TCP port.
-
-        Raises
-        -------
-        SystemError
-            Cannot connect to MQTT broker.
 
         """
         if not hasattr(self, '_client'):
@@ -377,14 +371,7 @@ class MqttBroker():
             self.disconnect()
 
     def reconnect(self) -> NoReturn:
-        """Reconnect to MQTT broker.
-
-        Raises
-        -------
-        SystemError
-            Cannot reconnect to MQTT broker.
-
-        """
+        """Reconnect to MQTT broker."""
         if not hasattr(self, '_client'):
             return
         client = self._clientid
@@ -413,14 +400,7 @@ class MqttBroker():
                 port=self._port)
 
     def disconnect(self) -> NoReturn:
-        """Disconnect from MQTT broker.
-
-        Raises
-        -------
-        SystemError
-            Cannot disconnect from MQTT broker.
-
-        """
+        """Disconnect from MQTT broker."""
         if not hasattr(self, '_client'):
             return
         client = self._clientid
@@ -429,8 +409,8 @@ class MqttBroker():
         try:
             self._client.loop_stop()
             self._client.disconnect()
-            msg = f'{msg} succeeded'
-            self._logger.info(msg)
+            log = f'{msg} succeeded'
+            self._logger.info(log)
         except Exception as errmsg:
             log = f'{msg} failed: {errmsg}'
             self._logger.exception(log)
@@ -460,15 +440,14 @@ class MqttBroker():
         result = self._client.subscribe(topic, qos)
         result_code = result[0]
         if result_code == mqttclient.MQTT_ERR_SUCCESS:
-            msg = f'MQTT client subscribed to {topic=}, {qos=}'
-            self._logger.debug(msg)
+            log = f'MQTT client subscribed to {topic=}, {qos=}'
+            self._logger.debug(log)
         # elif result_code == mqttclient.MQTT_ERR_NO_CONN:
         else:
             log = \
                 f'MQTT subscription to {topic=}' \
                 f' failed with result code={result_code}'
             self._logger.error(log)
-            raise SystemError(log)
 
     def publish(self,
                 message: str,
@@ -495,9 +474,9 @@ class MqttBroker():
         qos = self.check_qos(qos)
         retain = bool(retain)
         msg = f'Publishing to MQTT {topic=}'
-        msg = f'{msg}, {qos=}, {retain=}: {message}'
+        log = f'{msg}, {qos=}, {retain=}: {message}'
         self._client.publish(topic, message, qos, retain)
-        self._logger.debug(msg)
+        self._logger.debug(log)
 
     def lwt(self,
             message: str,
@@ -531,8 +510,8 @@ class MqttBroker():
         msg = f'MQTT LWT {topic=}'
         try:
             self._client.will_set(topic, message, qos, retain)
-            msg = f'{msg}, {qos=}, {retain=}: {message}'
-            self._logger.debug(msg)
+            log = f'{msg}, {qos=}, {retain=}: {message}'
+            self._logger.debug(log)
         except Exception as errmsg:
             log = f'{msg} failed: {errmsg}'
             self._logger.exception(log)
