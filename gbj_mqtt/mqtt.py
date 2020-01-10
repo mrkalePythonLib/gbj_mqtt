@@ -361,14 +361,15 @@ class MqttBroker():
             log = f'{msg} failed: {errmsg}'
             self._logger.error(log)
             self._client.loop_stop()
-        # Waiting for connection
-        if self._eventor.wait(self.Param.TIMEOUT.value):
-            log = f'{msg} succeeded'
-            self._logger.info(log)
         else:
-            log = f'{msg} timeouted'
-            self._logger.error(log)
-            self.disconnect()
+            # Waiting for connection
+            if self._eventor.wait(self.Param.TIMEOUT.value):
+                log = f'{msg} succeeded'
+                self._logger.info(log)
+            else:
+                log = f'{msg} timeouted'
+                self._logger.error(log)
+                self.disconnect()
 
     def reconnect(self) -> NoReturn:
         """Reconnect to MQTT broker."""
