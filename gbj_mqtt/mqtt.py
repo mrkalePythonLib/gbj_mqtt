@@ -264,7 +264,7 @@ class MqttBroker():
         if result == 0:
             self.connected = True
             self._eventor.set()
-        if self._cb_on_connect is not None:
+        if self._cb_on_connect:
             self._cb_on_connect(userdata, flags, result)
 
     def _on_disconnect(self,
@@ -287,7 +287,7 @@ class MqttBroker():
             f'MQTT on disconnect: {userdata=}' \
             f', {result=} ({Result(result).name})'
         self._logger.debug(log)
-        if self._cb_on_disconnect is not None:
+        if self._cb_on_disconnect:
             self._cb_on_disconnect(userdata, result)
         self._client.loop_stop()
         self.connected = False
@@ -300,7 +300,7 @@ class MqttBroker():
         """Process actions when MQTT broker responds to the subscription."""
         log = f'MQTT on subscribe: {userdata=}, {mid=}, {granted_qos=}'
         self._logger.debug(log)
-        if self._cb_on_subscribe is not None:
+        if self._cb_on_subscribe:
             self._cb_on_subscribe(userdata, mid, granted_qos)
 
     def _on_message(self,
@@ -318,7 +318,7 @@ class MqttBroker():
             f'MQTT on message: {userdata=}, {topic=}, {qos=}, {retain=}' \
             f', {payload=}'
         self._logger.debug(log)
-        if self._cb_on_message is not None:
+        if self._cb_on_message:
             self._cb_on_message(userdata, message)
 
     def connect(self, **kwargs) -> NoReturn:
