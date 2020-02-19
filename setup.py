@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 """Setup function for the package."""
 
-from setuptools import setup
+from setuptools import setup, find_namespace_packages
 
 setup(
   name='gbj_mqtt',
-  version='1.0.0',
+  version='1.0.1',
   description='Python package for module mqtt.',
   long_description='Processing MQTT messages by MQTT clients.',
   classifiers=[
@@ -20,7 +20,7 @@ setup(
   author='Libor Gabaj',
   author_email='libor.gabaj@gmail.com',
   license='MIT',
-  packages=['gbj_mqtt'],
+  packages=find_namespace_packages(),
   install_requires=['paho-mqtt'],
   include_package_data=True,
   zip_safe=False
